@@ -1,43 +1,49 @@
 <p align="center">
-  <img src="./assets/readme/hero.svg" width="100%" alt="git-ship 通过带安全检查的 Git 工作流，把工作区改动送进 main">
+  <img src="./assets/readme/hero.svg" width="100%" alt="git-ship 通过带边界检查的 Git 工作流，把明确范围的改动交付到默认分支">
 </p>
 
 <p align="center">
   <a href="./README.md">English</a>
 </p>
 
-`git-ship` 是一个 Agent Skill，用来完成改动写完之后那段重复的 Git 流程：
+Git Ship 用目标仓库已有的 GitHub 流程处理明确范围的工作区改动。默认模式保持全自动：
 
 ```text
-工作区改动 → 最新 main → 新分支 → commit → 本地验证 → PR → squash merge
+工作区改动 → 范围检查 → 最新默认分支 → 任务分支 → commit
+→ 本地验证 → PR → CI 修复 → 合并 → 清理
 ```
 
-调用 `ship` 就表示授权完整发布流程。它会自动生成分支名、Conventional Commit 和 PR 内容，主动解决冲突并修复验证或 CI 失败，直到 PR 成功合并。
+需要人工审查时，明确使用 `ship --review`，流程会在 PR 创建或更新后停止。
 
 <p align="center">
-  <img src="./assets/readme/workflow.svg" width="100%" alt="git-ship 七个带安全检查的工作阶段">
+  <img src="./assets/readme/workflow.svg" width="100%" alt="git-ship 带边界检查的工作阶段">
 </p>
 
 ## 它解决什么问题
 
-- 同步最新 `main` 时，先妥善暂存当前改动。
-- 每次发布都使用新的语义化分支。
-- 自动生成 Conventional Commit 和清楚的 PR 摘要。
-- 推送前运行目标仓库已有检查，并主动修复失败。
-- 结合最新线上功能和当前功能目标自动解决冲突。
-- 读取 CI 日志、修复问题并持续重试。
-- PR squash 合并后删除远端分支，并回到最新 `main`。
-- 仅在认证、权限、人工审批等外部条件无法自行解决时暂停。
+- 默认一路推进到实际合并，而不是只创建 PR 就结束。
+- 在写入 Git 状态前识别任务范围，只暂存明确路径。
+- 使用仓库真实默认分支和已有验证命令。
+- 读取 CI 失败并修复范围内的安全问题，提交后重新等待检查。
+- 保留无关改动、已有分支、本地独有提交和用户已有 stash。
+- 仅在范围歧义、认证、权限、人工审批或外部服务等阻塞无法自行解决时暂停。
+- 提供明确的审查模式，但不把审查模式设为默认。
 
 ## 安装
 
-把仓库克隆到 Agent 能发现 Skill 的目录：
+将 fork 版本安装为用户级 Codex Skill：
 
 ```bash
-git clone https://github.com/oil-oil/git-ship.git ~/.agents/skills/git-ship
+npx skills add liangjie78/git-ship -g -a codex
 ```
 
-如果你的客户端使用其他 Skill 目录，请克隆到对应位置。真正的入口文件是 `SKILL.md`。
+也可以克隆到 Agent 能发现 Skill 的目录：
+
+```bash
+git clone https://github.com/liangjie78/git-ship.git ~/.agents/skills/git-ship
+```
+
+入口文件是 `SKILL.md`。如果宿主会缓存 Skill，安装后重新加载宿主。
 
 ## 使用
 
@@ -47,57 +53,61 @@ git clone https://github.com/oil-oil/git-ship.git ~/.agents/skills/git-ship
 ship
 ```
 
-也可以提前指定分支和 commit：
+这会走完整流程：commit、push、PR、CI 修复、合并和清理。也可以在调用时指定分支或 commit：
 
 ```text
 把这次改动 ship 为 feat/add-export，commit 用 "feat(export): add markdown export"
 ```
 
-`git-ship` 会展示自动确定的方案，然后立即继续：
+需要创建 PR 并交给人工审查时：
 
 ```text
-📦 准备 ship：
-  分支名：feat/add-export
-  Commit：feat(export): add markdown export
-  目标：main ← feat/add-export（squash merge）
+ship --review
 ```
 
-不需要确认分支名、commit message、PR 标题或 PR 正文。需要特定名称时，在调用 `ship` 时直接提供即可。
+之后再次执行不带 `--review` 的 `ship`，即可继续现有任务 PR 的完整交付。只要求 commit、push 或创建 PR 的普通请求，
+不会触发完整 Ship 流程。
 
 ## 工作流程
 
-| 阶段 | 动作 | 安全检查 |
-| --- | --- | --- |
-| 检查 | 读取工作区和未推送提交 | 没有可发布内容时停止 |
-| 同步 | stash 改动并获取最新 `origin/main` | 保留本地独有提交 |
-| 分支 | 创建唯一分支或复用当前功能分支 | 不重复提交相同改动 |
-| 提交 | 恢复改动并提交全部文件 | 自动解决 stash 冲突 |
-| 验证 | 运行仓库已有检查 | 修复根因并循环重跑 |
-| 发布 | push 并通过 `gh` 创建 PR | 需要完成 GitHub 登录 |
-| CI | 等待必需检查并读取失败日志 | 修复、提交、重新等待 |
-| 合并 | 再次同步 main、squash、删分支 | 自动解决新冲突 |
-| 完成 | 确认 PR 已合并并回到 `main` | 不使用强推或硬重置 |
+| 阶段 | 默认 `ship` | `ship --review` | 边界检查 |
+| --- | --- | --- | --- |
+| 检查 | 建立任务范围并读取仓库状态 | 相同 | 范围不明或归属混合时停止 |
+| 同步 | 获取真实默认分支并保留范围内改动 | 相同 | 不覆盖本地独有提交 |
+| 分支 | 创建或复用任务分支 | 相同 | 不复用无关分支 |
+| 提交 | 暂存明确路径并运行钩子 | 相同 | 不使用 `git add -A` |
+| 验证 | 运行已有检查并修复范围内失败 | 相同的本地检查 | 不编造或弱化检查 |
+| 发布 | push 并创建或更新 PR | 相同 | 需要正常 GitHub 写权限 |
+| CI | 等待、诊断、修复、push、再次等待 | 在 PR 处停止 | 不绕过或伪造通过 |
+| 合并 | 遵循仓库策略并合并 | 不合并 | 不使用管理员权限或绕过保护 |
+| 清理 | 只删除本次创建且已合并的分支并回到默认分支 | 不清理 | 保留预先存在的分支 |
 
 ## 运行要求
 
 - Git
 - 已通过 `gh auth login` 登录的 [GitHub CLI](https://cli.github.com/)
-- 主分支为 `main` 的 Git 仓库
-- 在 `AGENTS.md`、`README.md`、`package.json`、`pyproject.toml` 或 `Makefile` 等文件中记录验证命令
+- 能发现真实默认分支并具备正常 push/PR 权限的仓库
+- 仓库已有的验证命令（如果项目提供）
 
-如果找不到可信的验证命令，Skill 会明确说明跳过，不会自行猜测。
+找不到可信验证命令时，Git Ship 会明确报告，不会自行猜测。必需人工审批、权限不足、服务不可用、范围无法判断，
+或修复后同一失败没有新证据地重复出现，属于外部停止条件。
 
 ## 安全边界
 
-调用 `ship` 本身就是对完整发布流程、冲突解决和相关验证修复的授权。Skill 会保留最新线上能力与当前功能目标，修复测试、lint、类型、构建和 CI 问题。它不会使用 force push、`reset --hard`、跳过检查或弱化有效测试。只有认证、权限、人工审批等外部阻塞才需要用户介入。
+明确调用 `ship` 授权当前任务范围内的 commit、正常 push、PR、修复、合并和清理，不授权无关文件或用户已有分支。
+`ship --review` 只改变停止位置，不会默默改变默认模式。
+
+Git Ship 不使用 force push、硬重置、清理工作区、跳过钩子或测试、弱化有效断言、管理员合并或绕过分支保护；
+需要停止时保留现场，确保后续可以继续。
 
 ## 自定义
 
-你可以 fork 仓库并修改 `SKILL.md`，接入团队自己的分支命名、合并策略、PR 模板或必跑检查。增加自动化时，应保留非破坏性修复原则和外部权限边界。
+可以 fork 本仓库，修改 `SKILL.md` 以适配团队的分支命名、合并策略、PR 模板或必需检查。请保留范围检查、显式暂存、
+非破坏性恢复、审查开关和外部权限边界。
 
 ## 参与贡献
 
-欢迎提交 Issue 和 PR。请保持改动聚焦，说明新增的 Git 行为，并为每个新增动作写清楚失败处理。
+保持改动聚焦，说明行为与失败路径，并同时验证默认全自动交付和 `--review` 行为。
 
 ## 开源协议
 

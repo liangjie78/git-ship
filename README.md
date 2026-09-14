@@ -1,126 +1,116 @@
 <p align="center">
-  <img src="./assets/readme/hero.svg" width="100%" alt="git-ship turns working-tree changes into a reviewed squash merge through a guarded Git workflow">
+  <img src="./assets/readme/hero.svg" width="100%" alt="git-ship turns scoped working-tree changes into a guarded delivery workflow">
 </p>
 
 <p align="center">
   <a href="./README.zh-CN.md">简体中文</a>
 </p>
 
-完成代码检查、分支整理、提交、推送、创建 PR 和合并，处理流程中的冲突与验证失败。
+Git Ship takes a clearly scoped working-tree change through the repository's existing GitHub workflow.
+The default mode remains fully autonomous:
 
 ```text
-working tree → latest main → new branch → commit → local checks → PR → squash merge
+working tree → scope guard → latest default branch → task branch → commit
+→ local checks → PR → CI repair → merge → cleanup
 ```
 
-Invoking `ship` authorizes the full workflow. It generates the branch name, Conventional Commit, and PR content, resolves conflicts, fixes validation or CI failures, and continues until the PR is merged.
+Use `ship --review` when you want the same preparation to stop at the PR for human review.
 
 <p align="center">
-  <img src="./assets/readme/workflow.svg" width="100%" alt="The seven guarded stages of the git-ship workflow">
+  <img src="./assets/readme/workflow.svg" width="100%" alt="The guarded stages of the git-ship workflow">
 </p>
 
 ## Why use it
 
-- Keeps local changes safe while synchronizing with the latest `main`.
-- Uses a fresh, descriptive branch for every shipment.
-- Creates a Conventional Commit and a readable pull request summary.
-- Runs the repository's existing checks and fixes failures before pushing.
-- Resolves conflicts while preserving both current production behavior and the new feature.
-- Reads CI logs, fixes failures, and retries until required checks pass.
-- Squash-merges the PR, deletes the remote branch, and returns to an up-to-date `main`.
-- Pauses only for external blockers such as missing authentication, permissions, or required human approval.
+- Ships all the way to a real merge by default, instead of stopping at PR creation.
+- Establishes the task boundary before writing Git state and stages explicit paths only.
+- Uses the repository's real default branch and existing validation commands.
+- Reads CI failures, fixes safe in-scope causes, and waits for the next check run.
+- Preserves unrelated changes, existing branches, local-only commits, and user-owned stashes.
+- Stops only for ambiguity or external blockers such as authentication, permissions, required approval, or unavailable services.
+- Supports an explicit review mode without making review mode the default.
 
 ## Install
 
-Clone the repository into a directory where your agent discovers skills:
+Install the fork for a user-level Codex Skill:
 
 ```bash
-git clone https://github.com/oil-oil/git-ship.git ~/.agents/skills/git-ship
+npx skills add liangjie78/git-ship -g -a codex
 ```
 
-If your client uses another skills directory, clone it there instead. The important entry point is `SKILL.md`.
+Alternatively, clone it into a directory where your agent discovers Skills:
+
+```bash
+git clone https://github.com/liangjie78/git-ship.git ~/.agents/skills/git-ship
+```
+
+The entry point is `SKILL.md`. Reload the host after installation if it caches Skills.
 
 ## Use
 
-Finish your change, leave it uncommitted in the working tree, then ask your agent:
+Finish the change and leave it in the working tree, then ask your agent:
 
 ```text
 ship
 ```
 
-You can also provide the branch and commit up front:
+This invokes the full path: commit, push, PR, CI repair, merge, and cleanup. You can provide a branch or commit message:
 
 ```text
 Ship this as feat/add-export with commit "feat(export): add markdown export"
 ```
 
-`git-ship` shows the resolved plan and then continues immediately:
+For a PR handoff without merge or cleanup:
 
 ```text
-📦 Ready to ship:
-  Branch: feat/add-export
-  Commit: feat(export): add markdown export
-  Target: main ← feat/add-export (squash merge)
+ship --review
 ```
 
-It does not ask for confirmation of the branch name, commit message, PR title, or PR body. Provide explicit names in the initial request when needed.
+Run `ship` again later to continue an existing task PR through the full delivery path. Ordinary requests to only commit,
+push, or create a PR do not trigger the complete Ship workflow.
 
-## How it works
+## Workflow
 
-| Stage | Action | Guard |
-| --- | --- | --- |
-| Inspect | Read working-tree changes and unpushed commits | Stops only when there is nothing to ship |
-| Sync | Stash changes and fetch the latest `origin/main` | Preserves local-only commits |
-| Branch | Create a unique branch or reuse the feature branch | Never duplicates the same change |
-| Commit | Restore changes and commit all files | Resolves stash conflicts |
-| Verify | Run documented repository checks | Fixes root causes and reruns checks |
-| Publish | Push and create a PR with `gh` | Requires GitHub authentication |
-| CI | Wait for checks and inspect failed logs | Fixes, pushes, and waits again |
-| Merge | Resync main, squash, and delete the branch | Resolves newly introduced conflicts |
-| Finish | Confirm the merge and return to `main` | Never force-pushes or hard-resets |
+| Stage | Default `ship` | `ship --review` | Guard |
+| --- | --- | --- | --- |
+| Inspect | Establish scope and repository state | Same | Stops on ambiguous or mixed ownership |
+| Sync | Fetch the real default branch and preserve scoped changes | Same | Does not overwrite local-only commits |
+| Branch | Create or reuse a task branch | Same | Does not reuse an unrelated branch |
+| Commit | Stage explicit paths and run hooks | Same | Never uses `git add -A` |
+| Verify | Run documented checks and repair in-scope failures | Same local checks | Does not invent or weaken checks |
+| Publish | Push and create or update a PR | Same | Requires normal GitHub write access |
+| CI | Wait, diagnose, repair, push, and wait again | Stop at PR | No bypass or fake pass |
+| Merge | Follow repository policy and merge | Do not merge | No admin or protection bypass |
+| Cleanup | Delete only the run-owned merged branch and return to the base branch | Do not clean | Preserve pre-existing branches |
 
 ## Requirements
 
 - Git
 - [GitHub CLI](https://cli.github.com/) authenticated with `gh auth login`
-- A repository whose primary branch is `main`
-- Repository validation commands documented in files such as `AGENTS.md`, `README.md`, `package.json`, `pyproject.toml`, or `Makefile`
+- A repository with a discoverable default branch and normal push/PR permissions
+- Validation commands documented by the repository, when available
 
-When no trustworthy validation command exists, the Skill reports that clearly instead of inventing one.
+When no trustworthy validation command exists, Git Ship reports that fact instead of inventing one. A required human approval,
+missing permission, unavailable service, unresolved scope, or repeated failure without new evidence is an external stop.
 
 ## Safety model
 
-Invoking `ship` authorizes the complete publishing workflow, conflict resolution, and related validation fixes. The Skill preserves current production behavior and the new feature while repairing test, lint, type, build, and CI failures. It never force-pushes, hard-resets, skips checks, or weakens valid tests. It asks for help only when an external blocker such as authentication, permissions, or required human approval cannot be resolved locally.
+An explicit `ship` invocation authorizes commit, normal push, PR, in-scope repair, merge, and cleanup for the current task.
+It does not authorize unrelated file changes or deletion of user-owned branches. `ship --review` changes only the stopping point;
+it never silently changes the default mode.
+
+Git Ship never force-pushes, hard-resets, cleans the working tree, skips hooks or tests, weakens valid assertions, uses an admin merge,
+or bypasses branch protection. It preserves the original state when it must stop.
 
 ## Customize
 
-Fork the repository and edit `SKILL.md` to match your team's branch naming, merge strategy, PR template, or required checks. Keep the non-destructive recovery rules and external permission boundaries intact.
+Fork this repository and update `SKILL.md` to match team-specific branch naming, merge policy, PR templates, or required checks.
+Keep the scope guard, explicit staging, non-destructive recovery, review switch, and external permission boundaries intact.
 
 ## Contributing
 
-Issues and pull requests are welcome. Please keep changes focused, explain any new Git behavior, and include the failure path for every new action.
+Keep changes focused, describe the behavior and failure path, and verify both default full delivery and `--review` behavior.
 
 ## License
 
 [MIT](./LICENSE)
-
-## 配置、依赖与使用边界
-
-需要 Git、GitHub CLI 与目标仓库写权限；复用 gh 的官方认证，不收集聊天中的密钥。命令中的主分支名以真实默认分支为准。
-
-调用 ship 即授权约定发布流程；先保留原分支与 HEAD，检查待提交内容。不把密钥、无关改动或失败检查一起发布。
-
-使用示例：
-
-```text
-ship 当前改动。
-```
-
-## GitHub 安装
-
-把 [仓库地址](https://github.com/oil-oil/git-ship) 交给 Agent，要求按 README 安装；也可运行：
-
-```bash
-npx skills add oil-oil/git-ship
-```
-
-安装后由宿主重新加载 Skill。
