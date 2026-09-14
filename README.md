@@ -26,7 +26,7 @@ Use `ship --review` when you want the same preparation to stop at the PR for hum
 - Establishes the task boundary before writing Git state and stages explicit paths only.
 - Uses the repository's real default branch and existing validation commands.
 - Reads CI failures, fixes safe in-scope causes, and waits for the next check run.
-- Preserves unrelated changes, existing branches, local-only commits, and user-owned stashes.
+- Preserves clearly unrelated changes, existing branches, local-only commits, and user-owned stashes; stops when ownership or safe exclusion is ambiguous.
 - Stops only for ambiguity or external blockers such as authentication, permissions, required approval, or unavailable services.
 - Supports an explicit review mode without making review mode the default.
 
@@ -79,7 +79,7 @@ push, or create a PR do not trigger the complete Ship workflow.
 | Commit | Stage explicit paths and run hooks | Same | Never uses `git add -A` |
 | Verify | Run documented checks and repair in-scope failures | Same local checks | Does not invent or weaken checks |
 | Publish | Push and create or update a PR | Same | Requires normal GitHub write access |
-| CI | Wait, diagnose, repair, push, and wait again | Stop at PR | No bypass or fake pass |
+| CI | Wait, diagnose, repair, push, and wait again | Stop at PR; do not wait or repair | No bypass or fake pass |
 | Merge | Follow repository policy and merge | Do not merge | No admin or protection bypass |
 | Cleanup | Delete only the run-owned merged branch and return to the base branch | Do not clean | Preserve pre-existing branches |
 
