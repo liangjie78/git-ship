@@ -20,6 +20,8 @@ Use `ship --review` when you want the same preparation to stop at the PR for hum
   <img src="./assets/readme/workflow.svg" width="100%" alt="The guarded stages of the git-ship workflow">
 </p>
 
+> This repository is a fork of [oil-oil/git-ship](https://github.com/oil-oil/git-ship). The installation examples below intentionally point to this `liangjie78/git-ship` fork.
+
 ## Why use it
 
 - Ships all the way to a real merge by default, instead of stopping at PR creation.
