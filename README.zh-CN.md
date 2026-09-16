@@ -19,6 +19,8 @@ Git Ship 用目标仓库已有的 GitHub 流程处理明确范围的工作区改
   <img src="./assets/readme/workflow.svg" width="100%" alt="git-ship 带边界检查的工作阶段">
 </p>
 
+> 本仓库是 [oil-oil/git-ship](https://github.com/oil-oil/git-ship) 的 fork；下面的安装示例明确指向当前的 `liangjie78/git-ship`，以本仓库的 `SKILL.md` 为准。
+
 ## 它解决什么问题
 
 - 默认一路推进到实际合并，而不是只创建 PR 就结束。
